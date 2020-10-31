@@ -14,5 +14,8 @@ You can choose a version other than 1.5.5
 
 ## WHAT IS DOES
 
-The playbook will install via apt a series of packages, among them openjdk
+* The playbook will install via apt a series of packages, among them openjdk.
+* It fetches the Besu tarball from Pegasys, and installs everything under /data
+* It stores older besu tarballs, so you can change the symlink to bin and lib to quickly switch to older versions or upgrade to a new one
+
 

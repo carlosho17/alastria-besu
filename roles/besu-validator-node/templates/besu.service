@@ -1,0 +1,21 @@
+[Unit]
+Description=Service to init besu service on boot
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=10
+
+[Service]
+WorkingDirectory=/data/besu/
+Environment=LOG4J_CONFIGURATION_FILE=/data/besu/config/besu/log-config.xml
+Environment=HOME=/data
+Type=simple
+User=besu
+ExecStart=/data/besu/bin/besu --config-file="/data/besu/config/besu/config.toml" --genesis-file="/data/besu/config/besu/genesis.json"
+KillMode=process
+RestartPreventExitStatus=255
+SuccessExitStatus=143
+Restart=on-failure
+RestartSec=10s
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,118 @@
+---
+- name: install dependencies for {{ ansible_distribution }}
+  apt: name="{{ item }}" update_cache=yes
+  with_items:
+    - software-properties-common
+    - unzip
+    - wget
+    - git
+    - make
+    - gcc
+    - build-essential
+    - libdb-dev
+    - zlib1g-dev
+    - libtinfo-dev
+    - sysvbanner
+    - psmisc
+    - libdb5.3-dev
+    - libsodium23
+    - libsodium-dev
+    - libasound2
+    - openjdk-11-jre-headless
+
+- name: create besu group
+  group: name=besu state=present
+
+- name: Create a user and 2048-bit SSH key for user besu in /home/besu/.ssh/id_rsa
+  user:
+    name: besu
+    groups: besu
+    create_home: True
+    home: /data
+    generate_ssh_key: yes
+    ssh_key_bits: 2048
+    ssh_key_file: .ssh/id_rsa
+
+- name: create subdirectories
+  file: path=/data/{{item}} state=directory owner=besu group=besu
+  with_items:
+  - besu
+  - versionesBesu
+
+- name: create subdirectories
+  file: path=/data/besu/{{item}} state=directory owner=besu group=besu
+  with_items:
+  - config
+  - keys
+  - data
+  - caches
+  - database
+  - uploads
+  - config/besu
+  - keys/besu
+
+- name: previous clearing
+  shell: rm -rf /tmp/besu && mkdir /tmp/besu
+  args:
+    warn: false
+
+- name: pull besu binaries
+  get_url:
+    url: "https://bintray.com/api/ui/download/hyperledger-org/besu-repo/besu-{{besu_version}}.tar.gz"
+    dest: "/tmp/besu/besu.tar.gz"
+
+- unarchive:
+        src: "/tmp/besu/besu.tar.gz"
+        dest: /data/versionesBesu/
+        copy: no
+
+- name: generate besu unit file
+  template: src=templates/besu.service dest=/lib/systemd/system/besu.service
+  notify:
+    reload systemd
+
+- meta: flush_handlers
+
+- name: stop the daemon
+  systemd: name=besu enabled=yes state=stopped
+
+- meta: flush_handlers
+
+- name: Symbolic link bin for new besu version
+  file: src="/data/versionesBesu/besu-{{besu_version}}/bin" dest="/data/besu/bin" state=link
+
+- name: Symbolic link lib for new besu version
+  file: src="/data/versionesBesu/besu-{{besu_version}}/lib" dest="/data/besu/lib" state=link
+
+- name: clearing unnecessary folders
+  shell: rm -rf /tmp/transit /tmp/besu
+  args:
+    warn: false
+
+- name: bring xml log strategy file into besu/config
+  copy: src=templates/log-config.xml dest=/data/besu/config/besu/ owner=besu group=besu
+  notify:
+  - restart besu
+
+- name: bring genesis.json in place
+  template: src=templates/genesis.json dest=/data/besu/config/besu/genesis.json owner=besu group=besu
+  notify:
+  - restart besu
+
+- name: bring DATABASE_METADATA.json in place
+  template: src=templates/DATABASE_METADATA.json dest=/data/besu/DATABASE_METADATA.json  owner=besu group=besu
+  notify:
+  - restart besu
+
+- name: bring config.toml in place
+  template: src=templates/config.toml.j2 dest=/data/besu/config/besu/config.toml owner=besu group=besu
+  notify:
+  - restart besu
+
+- name: start the thing
+  systemd: name=besu enabled=yes state=restarted
+
+- meta: flush_handlers
+
+- name: bring get_enode.json
+  template: src=templates/get_enode.sh dest=/data/besu/bin/get_enode.sh mode=0755
